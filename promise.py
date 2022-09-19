@@ -17,7 +17,7 @@ class Promise:
 		Parameters
 		----------
 		executor : Callable
-            A function to be executed by the constructor. It receives 
+			A function to be executed by the constructor. It receives 
 			two functions as parameters: resolutionFunc and rejectionFunc. 
 			Any errors thrown in the executor will cause the promise to be 
 			rejected, and the return value will be neglected. The semantics 
