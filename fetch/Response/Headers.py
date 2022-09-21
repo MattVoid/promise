@@ -1,7 +1,12 @@
+# https://developer.mozilla.org/en-US/docs/Web/API/Headers/delete
+# https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_header_name
+# https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_response_header_name
+from functools import wraps
+import functools
 import re
-from typing import Any
+from typing import Callable
 
-class Header:
+class Headers:
 
 	def __init__(self, init: dict = {}):
 		"""
@@ -20,6 +25,7 @@ class Header:
 
 		self.__headers = self.__parse_init(init)
 
+
 	def __parse_init(self, init: dict):
 
 		headers = {}
@@ -35,6 +41,34 @@ class Header:
 
 		return headers
 
+
+	#* ██████╗ ███████╗ ██████╗ ██████╗ ██████╗  █████╗ ████████╗ ██████╗ ██████╗ ███████╗
+	#* ██╔══██╗██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗██╔════╝
+	#* ██║  ██║█████╗  ██║     ██║   ██║██████╔╝███████║   ██║   ██║   ██║██████╔╝███████╗
+	#* ██║  ██║██╔══╝  ██║     ██║   ██║██╔══██╗██╔══██║   ██║   ██║   ██║██╔══██╗╚════██║
+	#* ██████╔╝███████╗╚██████╗╚██████╔╝██║  ██║██║  ██║   ██║   ╚██████╔╝██║  ██║███████║
+	#* ╚═════╝ ╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝
+
+	def __check_http_header_name(func: Callable) -> bool:
+		"""
+		The __check_http_header_name() method of the Headers interface 
+		checks if a header name is valid.
+		"""
+
+		def inner(self, *args):
+
+			args = list(args)
+			name = args[0].lower()
+
+			if re.match('^[a-zA-Z0-9_-]+$', name):
+
+				args[0] = name
+				return func(self, *args)
+			else:
+				raise TypeError(f"Failed to execute '{func.__name__}' on 'Headers': Invalid name")
+		
+		return inner
+                         
 	#* ███╗   ███╗ █████╗  ██████╗ ██╗ ██████╗
 	#* ████╗ ████║██╔══██╗██╔════╝ ██║██╔════╝
 	#* ██╔████╔██║███████║██║  ███╗██║██║     
@@ -99,12 +133,12 @@ class Header:
 
 		return iter(self.__headers.values())
 								
-	
-	def forEach(self):
+	def forEach(self, callback: Callable[[str, str], None]) -> None:
 		"""
 		The Headers.forEach() method executes a callback function once 
 		per each key/value pair in the Headers object.
 		"""
+
 
 	#*  █████╗  ██████╗████████╗██╗ ██████╗ ███╗   ██╗
 	#* ██╔══██╗██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║
@@ -113,20 +147,19 @@ class Header:
 	#* ██║  ██║╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║
 	#* ╚═╝  ╚═╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
                                                
-
+	@__check_http_header_name
 	def append(self, name: str, value: str) -> None:
 		"""
 		The append() method of the Headers interface appends a new value 
 		onto an existing header inside a Headers object, or adds the 
 		header if it does not already exist.
 		"""
-		
-		name = name.lower()
 
 		if name in self.__headers:
 			self.__headers[name] = f"{self.__headers[name]}, {value}"
 		else: self.set(name, value)
 
+	@__check_http_header_name
 	def delete(self, name: str) -> None:
 		"""
 		The delete() method of the Headers interface deletes a header 
@@ -137,12 +170,11 @@ class Header:
 		name : str
 			The name of the HTTP header you want to delete from the Headers object.
 		"""
-		
-		name = name.lower()
 
 		if name in self.__headers:
 			del self.__headers[name]
 
+	@__check_http_header_name
 	def get(self, name: str) -> str:
 		"""
 		The get() method of the Headers interface returns a byte string 
@@ -165,14 +197,13 @@ class Header:
 			object with a given name. If the requested header doesn't exist 
 			in the Headers object, it returns null.
 		"""
-		
-		name = name.lower() # <- The name is case-insensitive.
 
 		if name in self.__headers:
 			return self.__headers[name]
 
 		return None
 
+	@__check_http_header_name
 	def has(self, name: str) -> bool:
 		"""
 		The has() method of the Headers interface returns a boolean stating 
@@ -185,13 +216,9 @@ class Header:
 			name is not a valid HTTP header name, this method throws a TypeError.
 		"""
 
-		name = name.lower()
-
-		if not re.match('^[a-zA-Z0-9_-]+$', name):
-			raise TypeError("Failed to execute 'has' on 'Headers': Invalid name")
-
 		return name in self.__headers
-
+	
+	@__check_http_header_name
 	def set(self, name: str, value: str) -> None:
 		"""
 		The set() method of the Headers interface sets a new value for an 
@@ -213,6 +240,14 @@ class Header:
 		None
 		"""
 
-		name = name.lower()
-
 		self.__headers[name] = value # <- "set" overwrites the value of an existing header.
+
+if __name__ == "__main__":
+	headers = Headers()
+	headers.set("Content-Type", "application/json")
+	headers.set("Content-Length", "123")
+	headers.set("Content-Type", "application/json; charset=utf-8")
+
+	del headers["content-lengthé**é*§?"]
+	
+	print(headers.get("content-length"))
