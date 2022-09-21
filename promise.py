@@ -4,11 +4,11 @@ from time import sleep
 from typing import Any, Callable, List
 import threading
 
-PENDING = 0
-FULFILLED = 1
-REJECTED = -1
-
 class Promise:
+
+	PENDING = 0
+	FULFILLED = 1
+	REJECTED = -1
 
 	def __init__(self, executor: Callable):
 		"""
@@ -32,21 +32,21 @@ class Promise:
 			an argument, it can be said to be "resolved", but still not "settled". 
 			See the Promise description for more explanation.
 		"""
-		self._state = PENDING
+		self.__state = self.PENDING
 
-		self._handleFulfilled = None
-		self._handleRejected = None
+		self.__handleFulfilled = None
+		self.__handleRejected = None
 
-		self._execution_value = None
-		self._execution_reason = None
-		self._execution_thread = None
+		self.__execution_value = None
+		self.__execution_reason = None
+		self.__execution_thread = None
 
 		self._rejection_value = None
 
 		if executor:
 
-			self._execution_thread = threading.Thread(target=self._resolve_executor, args=(executor,))
-			self._execution_thread.start()
+			self.__execution_thread = threading.Thread(target=self.__resolve_executor, args=(executor,))
+			self.__execution_thread.start()
 
 	# * ██████╗ ██████╗ ██╗██╗   ██╗ █████╗ ████████╗███████╗
 	# * ██╔══██╗██╔══██╗██║██║   ██║██╔══██╗╚══██╔══╝██╔════╝
@@ -55,7 +55,7 @@ class Promise:
 	# * ██║     ██║  ██║██║ ╚████╔╝ ██║  ██║   ██║   ███████╗
 	# * ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═╝  ╚═╝   ╚═╝   ╚══════╝
                                                      
-	def _resolutionFunc(self, value: Any):
+	def __resolutionFunc(self, value: Any):
 		"""
 		Parameters
 		----------
@@ -73,14 +73,14 @@ class Promise:
 		# Only the first call to resolutionFunc or rejectionFunc affects the promise's 
 		# state, and subsequent calls to either function can neither change the fulfillment 
 		# value/rejection reason nor toggle the state from "fulfilled" to "rejected" or opposite
-		if self._state == PENDING: self._state = FULFILLED
+		if self.__state == self.PENDING: self.__state = self.FULFILLED
 
-		self._execution_value = value
+		self.__execution_value = value
 
-		if self._handleFulfilled:
-			self._execution_value = self._handleFulfilled(self._execution_value)
+		if self.__handleFulfilled:
+			self.__execution_value = self.__handleFulfilled(self.__execution_value)
 
-	def _rejectionFunc(self, reason: Any):
+	def __rejectionFunc(self, reason: Any):
 		"""
 		Parameters
 		----------
@@ -96,17 +96,17 @@ class Promise:
 		# Only the first call to resolutionFunc or rejectionFunc affects the promise's 
 		# state, and subsequent calls to either function can neither change the fulfillment 
 		# value/rejection reason nor toggle the state from "fulfilled" to "rejected" or opposite
-		if self._state == PENDING: self._state = REJECTED
+		if self.__state == self.PENDING: self.__state = self.REJECTED
 
-		if self._handleRejected:
-			self._execution_value = self._handleRejected(reason)
+		if self.__handleRejected:
+			self.__execution_value = self.__handleRejected(reason)
 
-	def _resolve_executor(self, executor: Callable):
+	def __resolve_executor(self, executor: Callable):
 		try:
-			executor(self._resolutionFunc, self._rejectionFunc) 
+			executor(self.__resolutionFunc, self.__rejectionFunc) 
 		except Exception as reason:
-			self._execution_reason = reason
-			self._rejectionFunc(reason)
+			self.__execution_reason = reason
+			self.__rejectionFunc(reason)
 
 	# * ██████╗ ██╗   ██╗██████╗ ██╗     ██╗ ██████╗
 	# * ██╔══██╗██║   ██║██╔══██╗██║     ██║██╔════╝
@@ -142,20 +142,23 @@ class Promise:
 			of handleRejected will be used as the fulfillment value of the returned Promise. 
 			If handleRejected is not a function, it will be ignored.
 		"""
-		self._handleFulfilled = handleFulfilled # <- call in _resolutionFunc
-		self._handleRejected = handleRejected # <- call in _rejectionFunc
+
+		# set the handlers
+		self.__handleFulfilled = handleFulfilled # <- call in __resolutionFunc
+		self.__handleRejected = handleRejected # <- call in __rejectionFunc
 
 		def executor(resolve, _):
 
 			# await promise to be resolved
-			if self._state == PENDING:
-				self._execution_thread.join()
-			elif self._state == FULFILLED and self._handleFulfilled:
-				self._execution_value = self._handleFulfilled(self._execution_value)
-			elif self._state == REJECTED and self._handleRejected:
-				self._execution_value = self._handleRejected(self._execution_reason)
+			if self.__state == self.PENDING:
+				self.__execution_thread.join() # <- wait for the promise to be resolved
+			elif self.__state == self.FULFILLED and self.__handleFulfilled:
+				self.__execution_value = self.__handleFulfilled(self.__execution_value)
+			elif self.__state == self.REJECTED and self.__handleRejected:
+				self.__execution_value = self.__handleRejected(self.__execution_reason)
 
-			resolve(self._execution_value)
+			if self.__state == self.FULFILLED: resolve(self.__execution_value)
+			elif self.__state == self.REJECTED: resolve(self.__execution_reason)
 
 		return Promise(executor)
 
@@ -196,24 +199,3 @@ class Promise:
 			# ignore if item is not a Promise
 			if isinstance(item, Promise):
 				promise = item
-
-				
-
-if __name__ == "__main__":
-	
-	def callback(resolve, reject):
-		print('init callback')
-
-		# raise Exception('error')
-
-		sleep(1)
-		resolve("ressasasaolve")
-
-	print('init promise')
-	promise = Promise(callback)
-
-	print('init then')
-	# promise.catch(lambda reason: print("Error: " + reason.__str__()))
-	promise.then(lambda value: print(value)).then(lambda value: print(value))
-
-	print('end')
