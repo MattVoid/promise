@@ -1,6 +1,4 @@
 # promise state
-import asyncio
-from time import sleep
 from typing import Any, Callable, List
 import threading
 
