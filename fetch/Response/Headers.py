@@ -1,8 +1,6 @@
 # https://developer.mozilla.org/en-US/docs/Web/API/Headers/delete
 # https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_header_name
 # https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_response_header_name
-from functools import wraps
-import functools
 import re
 from typing import Callable
 
@@ -53,6 +51,8 @@ class Headers:
 		"""
 		The __check_http_header_name() method of the Headers interface 
 		checks if a header name is valid.
+
+		for validation follow: https://developers.cloudflare.com/rules/transform/request-header-modification/reference/header-format/
 		"""
 
 		def inner(self, *args):

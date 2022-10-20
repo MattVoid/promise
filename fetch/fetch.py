@@ -1,6 +1,8 @@
 from typing import Any
+from fetch.Response.Response import Response
 from promise import Promise
 import requests
+
 
 def _parse_parameter(options, parameter: Any) -> Any:
 	
@@ -19,14 +21,20 @@ def _parse_parameter(options, parameter: Any) -> Any:
 	elif parameter == "keepalive": default_value = False
 	elif parameter == "signal": default_value = None
 
-	if parameter in options:
-		return options[parameter]
-	else:
-		return default_value
+	return options[parameter] if parameter in options else default_value
 
 
-def _fetch(resolve, reject):
-	
+def _fetch(url: str, options: dict = {}):
+	"""Fetch a URL and return the response body.
+
+	Args:
+		url: The URL to fetch.
+		options: A dictionary of options.
+
+	Returns:
+		The response body.
+	"""
+
 	#>> requeired parameters
 	method = _parse_parameter(options, "method")
 
@@ -45,7 +53,7 @@ def _fetch(resolve, reject):
 	body = _parse_parameter(options, "body")
 	credentials = _parse_parameter(options, "credentials")
 	
-	requests.request(
+	requests_response = requests.request(
 		method=method,
 		url=url,
 		headers=headers,
@@ -60,6 +68,8 @@ def _fetch(resolve, reject):
 		keepalive=keepalive,
 		signal=signal
 	)
+
+	response = Response(requests_response)
 
 def fetch(url: str, options: dict = {}) -> Promise:
 	"""Fetch a URL and return the response body.

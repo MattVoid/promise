@@ -197,3 +197,8 @@ class Promise:
 			# ignore if item is not a Promise
 			if isinstance(item, Promise):
 				promise = item
+
+				def _then():
+					pass
+
+				promise.then
