@@ -1,5 +1,5 @@
 # promise state
-from typing import Any, Callable, List
+from typing import Any, Callable, Iterable, List
 import threading
 
 class Promise:
@@ -36,7 +36,6 @@ class Promise:
 		self.__handleRejected = None
 
 		self.__execution_value = None
-		self.__execution_reason = None
 		self.__execution_thread = None
 
 		self._rejection_value = None
@@ -46,14 +45,10 @@ class Promise:
 			self.__execution_thread = threading.Thread(target=self.__resolve_executor, args=(executor,))
 			self.__execution_thread.start()
 
-	# * ██████╗ ██████╗ ██╗██╗   ██╗ █████╗ ████████╗███████╗
-	# * ██╔══██╗██╔══██╗██║██║   ██║██╔══██╗╚══██╔══╝██╔════╝
-	# * ██████╔╝██████╔╝██║██║   ██║███████║   ██║   █████╗  
-	# * ██╔═══╝ ██╔══██╗██║╚██╗ ██╔╝██╔══██║   ██║   ██╔══╝  
-	# * ██║     ██║  ██║██║ ╚████╔╝ ██║  ██║   ██║   ███████╗
-	# * ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═╝  ╚═╝   ╚═╝   ╚══════╝
+	#--------------------------------------------------------------------------------
+	#--->> Private methods
                                                      
-	def __resolutionFunc(self, value: Any):
+	def __resolutionFunc(self, value: Any) -> None:
 		"""
 		Parameters
 		----------
@@ -78,7 +73,7 @@ class Promise:
 		if self.__handleFulfilled:
 			self.__execution_value = self.__handleFulfilled(self.__execution_value)
 
-	def __rejectionFunc(self, reason: Any):
+	def __rejectionFunc(self, reason: Any) -> None:
 		"""
 		Parameters
 		----------
@@ -96,6 +91,8 @@ class Promise:
 		# value/rejection reason nor toggle the state from "fulfilled" to "rejected" or opposite
 		if self.__state == self.PENDING: self.__state = self.REJECTED
 
+		self.__execution_value = reason
+
 		if self.__handleRejected:
 			self.__execution_value = self.__handleRejected(reason)
 
@@ -103,15 +100,11 @@ class Promise:
 		try:
 			executor(self.__resolutionFunc, self.__rejectionFunc) 
 		except Exception as reason:
-			self.__execution_reason = reason
+			self.__execution_value = reason
 			self.__rejectionFunc(reason)
 
-	# * ██████╗ ██╗   ██╗██████╗ ██╗     ██╗ ██████╗
-	# * ██╔══██╗██║   ██║██╔══██╗██║     ██║██╔════╝
-	# * ██████╔╝██║   ██║██████╔╝██║     ██║██║     
-	# * ██╔═══╝ ██║   ██║██╔══██╗██║     ██║██║     
-	# * ██║     ╚██████╔╝██████╔╝███████╗██║╚██████╗
-	# * ╚═╝      ╚═════╝ ╚═════╝ ╚══════╝╚═╝ ╚═════╝
+	#--------------------------------------------------------------------------------
+	#--->> Public methods
 
 	def then(self, handleFulfilled: Callable|None = None, handleRejected: Callable|None = None):
 		"""
@@ -145,7 +138,7 @@ class Promise:
 		self.__handleFulfilled = handleFulfilled # <- call in __resolutionFunc
 		self.__handleRejected = handleRejected # <- call in __rejectionFunc
 
-		def executor(resolve, _):
+		def executor(resolve, reject):
 
 			# await promise to be resolved
 			if self.__state == self.PENDING:
@@ -153,18 +146,21 @@ class Promise:
 			elif self.__state == self.FULFILLED and self.__handleFulfilled:
 				self.__execution_value = self.__handleFulfilled(self.__execution_value)
 			elif self.__state == self.REJECTED and self.__handleRejected:
-				self.__execution_value = self.__handleRejected(self.__execution_reason)
+				self.__execution_value = self.__handleRejected(self.__execution_value)
 
 			if self.__state == self.FULFILLED: resolve(self.__execution_value)
-			elif self.__state == self.REJECTED: resolve(self.__execution_reason)
+			elif self.__state == self.REJECTED: resolve(self.__execution_value)
 
 		return Promise(executor)
 
 	def catch(self, handleRejected):
 		self.then(None, handleRejected)
 
+	#--------------------------------------------------------------------------------
+	#--->> Static public methods
+
 	@staticmethod
-	def all(iterable: List[Any]):
+	def all(iterable: Iterable):
 		"""
 		The Promise.all() method takes an iterable of promises as an input, and returns a 
 		single Promise that resolves to an array of the results of the input promises. 
@@ -191,14 +187,40 @@ class Promise:
 			  See the example about "Asynchronicity or synchronicity of Promise.all" below. 
 			  Returned values will be in order of the Promises passed, regardless of completion order.
 		"""
+
+		resolve_matrix = [] #-> list of resolve functions
+		reject_matrix = [] #-> list of reject functions
 		
 		for item in iterable:
 
 			# ignore if item is not a Promise
 			if isinstance(item, Promise):
-				promise = item
+				promise = item #-> Promise
 
-				def _then():
-					pass
+				promise.then(
+					lambda value: resolve_matrix.append(value), 
+					lambda reason: reject_matrix.append(reason)
+				)
+			
+			else:
+				resolve_matrix.append(item)
 
-				promise.then
+		return Promise(lambda resolve, reject: resolve(resolve_matrix) if not reject_matrix else reject(reject_matrix))
+
+
+if __name__ == '__main__':
+
+	Promise(lambda _, reject: reject('error')).catch(lambda reason: print(reason)) #-> error
+	# Promise(lambda resolve, reject: resolve('error')).then(lambda reason: print(reason), lambda reason: print(reason)) #-> error
+
+	promise1 = Promise(lambda resolve, _: resolve(1))
+	promise2 = Promise(lambda resolve, _: resolve(2))
+	promise3 = 3
+
+	# Promise.all([promise1, promise2, promise3]).then(lambda value: print(value)) #-> [1, 2, 3]
+
+	promise1 = Promise(lambda resolve, _: resolve(1))
+	promise2 = Promise(lambda _, reject: reject(2))
+	promise3 = 3
+
+	# Promise.all([promise1, promise2, promise3]).catch(lambda value: print(value)) #-> [2]
